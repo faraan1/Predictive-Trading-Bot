@@ -1,8 +1,9 @@
+streamlit
 pandas
 numpy
+torch
+transformers
+scikit-learn
 yfinance
 beautifulsoup4
 requests
-python-dotenv
-transformers
-torch
