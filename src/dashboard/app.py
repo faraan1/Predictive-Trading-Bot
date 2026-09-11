@@ -29,64 +29,61 @@ st.sidebar.header("Configuration")
 selected_ticker = st.sidebar.selectbox("Select Asset Ticker", SUPPORTED_TICKERS)
 
 
-def run_pipeline_for_single_ticker(ticker_symbol, engine):
-    """Processes pipeline for a specific asset ticker and updates paper trading state."""
-    price_file = fetch_market_data(ticker=ticker_symbol)
-    news_file = fetch_latest_news(ticker=ticker_symbol)
-    sentiment_file = analyze_news_sentiment(news_file, ticker=ticker_symbol)
+def execute_selected_ticker_pipeline(ticker_symbol):
+    """Runs data collection, PyTorch ML inference, and paper trades exclusively for the selected ticker."""
+    engine = PaperTradingEngine(initial_capital=10000.0, max_risk_per_trade=0.10)
 
-    feature_file = f"data/processed/{ticker_symbol}_feature_matrix.csv"
-    build_unified_dataset(price_file, sentiment_file, feature_file)
+    with st.spinner(f"Running ML pipeline & executing paper trades for {ticker_symbol}..."):
+        # 1. Fetch market and news data
+        price_file = fetch_market_data(ticker=ticker_symbol)
+        news_file = fetch_latest_news(ticker=ticker_symbol)
 
-    prediction_prob = train_and_predict_ticker(feature_file, ticker_symbol)
+        # 2. Sentiment analysis
+        sentiment_file = analyze_news_sentiment(news_file, ticker=ticker_symbol)
 
-    df = pd.read_csv(feature_file)
-    recent_rows = df.tail(30).reset_index(drop=True)
+        # 3. Build unified feature matrix
+        feature_file = f"data/processed/{ticker_symbol}_feature_matrix.csv"
+        build_unified_dataset(price_file, sentiment_file, feature_file)
 
-    # Generate dynamic probability series across backtest days
-    for idx, row in recent_rows.iterrows():
-        trade_price = float(row["Close"])
-        sentiment_val = float(row.get("sentiment_score", 0.0))
+        # 4. PyTorch LSTM Inference
+        prediction_prob = train_and_predict_ticker(feature_file, ticker_symbol)
 
-        # Add step variation to signal probability across time
-        step_variation = float(np.sin(idx) * 0.08)
-        combined_prob = round(float(prediction_prob + step_variation + (sentiment_val * 0.05)), 4)
+        # 5. Execute paper trades across recent price history
+        df = pd.read_csv(feature_file)
+        recent_rows = df.tail(15).reset_index(drop=True)
 
-        engine.execute_signal(
-            ticker=ticker_symbol,
-            current_price=trade_price,
-            prediction_probability=combined_prob,
-            threshold=0.50
-        )
+        for idx, row in recent_rows.iterrows():
+            trade_price = float(row["Close"])
+            sentiment_val = float(row.get("sentiment_score", 0.0))
 
+            step_variation = float(np.sin(idx) * 0.07)
+            combined_prob = round(float(prediction_prob + step_variation + (sentiment_val * 0.05)), 4)
 
-def execute_full_multi_asset_pipeline():
-    """Runs data collection, PyTorch ML inference, and trades across ALL supported tickers."""
-    engine = PaperTradingEngine(initial_capital=10000.0)
-
-    with st.spinner("Running ML pipeline & executing paper trades across ALL assets..."):
-        for t in SUPPORTED_TICKERS:
-            try:
-                run_pipeline_for_single_ticker(t, engine)
-            except Exception as e:
-                st.warning(f"Error processing {t}: {e}")
+            engine.execute_signal(
+                ticker=ticker_symbol,
+                current_price=trade_price,
+                prediction_probability=combined_prob,
+                threshold=0.50
+            )
 
         engine.save_trade_logs()
         gc.collect()
 
-    st.sidebar.success("Pipeline & execution completed for all assets!")
+    st.sidebar.success(f"Pipeline & execution completed for {ticker_symbol}!")
 
 
-if st.sidebar.button("🚀 Run Pipeline for All Assets"):
-    execute_full_multi_asset_pipeline()
+# Sidebar execution button
+if st.sidebar.button(f"🚀 Run Pipeline for {selected_ticker}"):
+    execute_selected_ticker_pipeline(selected_ticker)
 
 trade_logs_path = "data/processed/trade_logs.json"
 feature_matrix_path = f"data/processed/{selected_ticker}_feature_matrix.csv"
 sentiment_path = f"data/processed/{selected_ticker}_news_sentiment.csv"
 
-if not os.path.exists(trade_logs_path) or not os.path.exists(feature_matrix_path):
-    st.info("Initializing multi-asset data and model predictions...")
-    execute_full_multi_asset_pipeline()
+# Auto-run if pre-computed data is missing for the chosen ticker
+if not os.path.exists(feature_matrix_path) or not os.path.exists(sentiment_path):
+    st.info(f"Initializing data and model predictions for {selected_ticker}...")
+    execute_selected_ticker_pipeline(selected_ticker)
 
 # ---------------------------------------------------------
 # Display Dashboard Sections
@@ -117,11 +114,19 @@ if os.path.exists(trade_logs_path):
     with open(trade_logs_path, "r") as f:
         logs = json.load(f)
 
-    st.metric(label="Current Balance", value=f"${logs.get('account_balance', 10000.0):,.2f}")
+    st.metric(label="Current Cash Balance", value=f"${logs.get('account_balance', 10000.0):,.2f}")
 
     if "history" in logs and logs["history"]:
-        st.write("**Recent Executed Trades Across Portfolio:**")
-        st.dataframe(pd.DataFrame(logs["history"]), width="stretch")
+        df_history = pd.DataFrame(logs["history"])
+        
+        # Filter trades specifically for the selected ticker
+        filtered_df = df_history[df_history["ticker"] == selected_ticker]
+
+        if not filtered_df.empty:
+            st.write(f"**Executed Trades for {selected_ticker}:**")
+            st.dataframe(filtered_df, width="stretch")
+        else:
+            st.info(f"No executed trades found for {selected_ticker} yet. Click '🚀 Run Pipeline for {selected_ticker}' to generate signals.")
     else:
         st.info("No trades executed yet.")
 else:
