@@ -1,11 +1,10 @@
 import os
 import sys
+import gc
 import json
-import numpy as np
 import pandas as pd
 import streamlit as st
 
-# Append root directory to sys.path to allow imports from src/
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
@@ -17,52 +16,37 @@ from src.ml_pipeline.processing.feature_builder import build_unified_dataset
 from src.ml_pipeline.models.price_predictor import train_and_predict_ticker
 from src.execution_engine.trade_executor import PaperTradingEngine
 
-# Page Config
 st.set_page_config(page_title="AI Predictive Trading Bot", layout="wide")
 
 st.title("📈 Multi-Asset AI Predictive Trading Bot")
 st.caption("Real-time price analytics, FinBERT news sentiment, PyTorch LSTM inference, and automated paper trading.")
 
-# Sidebar Configuration
 st.sidebar.header("Configuration")
 ticker = st.sidebar.selectbox("Select Asset Ticker", ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"])
 
 def execute_full_pipeline(selected_ticker):
     """Runs the end-to-end data pipeline & PyTorch inference dynamically."""
     with st.spinner(f"Running ML pipeline & training PyTorch LSTM for {selected_ticker}..."):
-        # 1. Fetch market and news data
         price_file = fetch_market_data(ticker=selected_ticker)
         news_file = fetch_latest_news(ticker=selected_ticker)
-
-        # 2. Sentiment analysis with explicit ticker
         sentiment_file = analyze_news_sentiment(news_file, ticker=selected_ticker)
 
-        # 3. Build unified feature matrix
         feature_file = f"data/processed/{selected_ticker}_feature_matrix.csv"
         build_unified_dataset(price_file, sentiment_file, feature_file)
 
-        # 4. PyTorch LSTM Inference
         prediction_prob = train_and_predict_ticker(feature_file, selected_ticker)
 
-        # 5. Dynamic Backtest & Multi-Trade Execution
         df = pd.read_csv(feature_file)
         engine = PaperTradingEngine(initial_capital=10000.0)
 
-        # Iterate over the last 30 trading days to simulate multi-day signals
         recent_rows = df.tail(30)
-        
         for idx, row in recent_rows.iterrows():
             trade_price = float(row["Close"])
             sentiment_val = float(row.get("sentiment_score", 0.0))
-            
-            # Combine sentiment score + moving average trends for dynamic probability variation
             sma_20 = row.get("SMA_20", trade_price)
             tech_signal = 0.52 if trade_price > sma_20 else 0.48
-            
-            # Weighted average model probability
             combined_prob = (prediction_prob * 0.4) + (tech_signal * 0.4) + (((sentiment_val + 1) / 2) * 0.2)
 
-            # Execute trade signal with 0.51 threshold
             engine.execute_signal(
                 ticker=selected_ticker,
                 current_price=trade_price,
@@ -71,26 +55,23 @@ def execute_full_pipeline(selected_ticker):
             )
 
         engine.save_trade_logs()
+        
+        # Free memory RAM explicitly for Cloud instance limits
+        gc.collect()
 
     st.sidebar.success(f"Pipeline & Model Inference completed for {selected_ticker}!")
 
-# Sidebar execution button
 if st.sidebar.button("🚀 Run Pipeline Now"):
     execute_full_pipeline(ticker)
 
-# Check file paths
 feature_matrix_path = f"data/processed/{ticker}_feature_matrix.csv"
 sentiment_path = f"data/processed/{ticker}_news_sentiment.csv"
 trade_logs_path = "data/processed/trade_logs.json"
 
-# Auto-run if files do not exist for chosen ticker
 if not os.path.exists(feature_matrix_path) or not os.path.exists(sentiment_path):
     st.info(f"No pre-computed data found for {ticker}. Automatically executing initial pipeline run...")
     execute_full_pipeline(ticker)
 
-# ---------------------------------------------------------
-# Display Dashboard Sections
-# ---------------------------------------------------------
 col1, col2 = st.columns(2)
 
 with col1:
