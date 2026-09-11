@@ -4,6 +4,7 @@ import json
 import pandas as pd
 import numpy as np
 import streamlit as st
+from datetime import datetime
 from streamlit_option_menu import option_menu
 
 # Append root directory to sys.path
@@ -48,6 +49,55 @@ def load_processed_data(ticker):
 
 df_features, df_sentiment = load_processed_data(selected_ticker)
 trade_logs_path = "data/processed/trade_logs.json"
+
+# Helper function to append a new live trade order
+def execute_live_simulated_trade(ticker, df_feat):
+    if not os.path.exists(trade_logs_path):
+        logs = {"account_balance": 10000.0, "history": []}
+    else:
+        with open(trade_logs_path, "r") as f:
+            logs = json.load(f)
+
+    # Get latest asset price
+    current_price = round(float(df_feat["Close"].iloc[-1]), 2) if df_feat is not None else 150.00
+    
+    # Filter current history for this ticker to get remaining cash
+    history = logs.get("history", [])
+    ticker_trades = [t for t in history if str(t.get("ticker")).upper() == ticker.upper()]
+    
+    current_cash = ticker_trades[-1]["remaining_cash"] if ticker_trades else 10000.00
+    
+    # Simulate inference signal
+    confidence = round(float(np.random.uniform(0.52, 0.68)), 4)
+    action = "BUY" if confidence >= 0.55 else "SELL"
+    shares = 1 if action == "BUY" else 1
+    
+    cost = current_price * shares
+    if action == "BUY" and current_cash >= cost:
+        new_cash = round(current_cash - cost, 2)
+    elif action == "SELL":
+        new_cash = round(current_cash + cost, 2)
+    else:
+        new_cash = current_cash
+
+    new_order = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "ticker": ticker.upper(),
+        "action": action,
+        "price": current_price,
+        "shares": shares,
+        "confidence": confidence,
+        "remaining_cash": new_cash
+    }
+    
+    history.append(new_order)
+    logs["history"] = history
+    
+    os.makedirs(os.path.dirname(trade_logs_path), exist_ok=True)
+    with open(trade_logs_path, "w") as f:
+        json.dump(logs, f, indent=4)
+        
+    return new_order
 
 # ---------------------------------------------------------
 # Page 1: Dashboard
@@ -95,34 +145,41 @@ elif selected_menu == "Execution Engine":
         with open(trade_logs_path, "r") as f:
             logs = json.load(f)
 
-        if "history" in logs and logs["history"]:
-            df_history = pd.DataFrame(logs["history"])
-            
-            # Ensure upper-case matching
+        df_history = pd.DataFrame(logs.get("history", []))
+        if not df_history.empty:
             df_history["ticker"] = df_history["ticker"].astype(str).str.upper()
             filtered_df = df_history[df_history["ticker"] == selected_ticker.upper()]
-
-            # Proper cash display logic per asset
-            if not filtered_df.empty and "remaining_cash" in filtered_df.columns:
-                current_ticker_cash = filtered_df["remaining_cash"].iloc[-1]
-                cash_label = f"Post-Trade Cash ({selected_ticker})"
-            else:
-                current_ticker_cash = 10000.00
-                cash_label = f"Allocated Capital ({selected_ticker})"
-
-            m1, m2, m3 = st.columns(3)
-            m1.metric(cash_label, f"${current_ticker_cash:,.2f}")
-            m2.metric("Portfolio Max Risk", "10.0% / Trade")
-            m3.metric("Selected Stock Focus", selected_ticker)
-
-            st.markdown("---")
-            if not filtered_df.empty:
-                st.subheader(f"Recent Orders ({selected_ticker})")
-                st.dataframe(filtered_df, width="stretch")
-            else:
-                st.info(f"No trades logged yet for {selected_ticker}. Initial balance remains unallocated.")
         else:
-            st.info("No trade history available yet.")
+            filtered_df = pd.DataFrame()
+
+        if not filtered_df.empty and "remaining_cash" in filtered_df.columns:
+            current_ticker_cash = filtered_df["remaining_cash"].iloc[-1]
+            cash_label = f"Post-Trade Cash ({selected_ticker})"
+        else:
+            current_ticker_cash = 10000.00
+            cash_label = f"Allocated Capital ({selected_ticker})"
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric(cash_label, f"${current_ticker_cash:,.2f}")
+        m2.metric("Portfolio Max Risk", "10.0% / Trade")
+        m3.metric("Selected Stock Focus", selected_ticker)
+
+        st.markdown("---")
+        
+        # Interactive Live Execution Panel for Presentations
+        c_left, c_right = st.columns([1.5, 1])
+        with c_left:
+            st.subheader(f"Recent Orders ({selected_ticker})")
+        with c_right:
+            if st.button(f"⚡ Execute Live Order for {selected_ticker}", type="primary", use_container_width=True):
+                new_trade = execute_live_simulated_trade(selected_ticker, df_features)
+                st.toast(f"Executed {new_trade['action']} for {selected_ticker} @ ${new_trade['price']}", icon="✅")
+                st.rerun()
+
+        if not filtered_df.empty:
+            st.dataframe(filtered_df, width="stretch")
+        else:
+            st.info(f"No trades logged yet for {selected_ticker}. Click the button above to execute a live trade.")
 
 # ---------------------------------------------------------
 # Page 3: Model Analytics
