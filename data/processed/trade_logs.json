@@ -1,0 +1,234 @@
+{
+    "account_balance": 3298.81,
+    "portfolio": {
+        "MSFT": 12,
+        "NVDA": 5
+    },
+    "history": [
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 487.92,
+            "shares": 2,
+            "confidence": 0.5181,
+            "remaining_cash": 9024.15
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 488.92,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 8535.23
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 480.93,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 8054.3
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 482.86,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 7571.45
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 481.86,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 7089.58
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 483.78,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 6605.8
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 484.94,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 6120.86
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 484.64,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 5636.22
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 484.03,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 5152.2
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 484.41,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 4667.79
+        },
+        {
+            "timestamp": "2026-09-12 01:30:01",
+            "ticker": "MSFT",
+            "action": "BUY",
+            "price": 480.57,
+            "shares": 1,
+            "confidence": 0.5181,
+            "remaining_cash": 4187.22
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 183.35,
+            "shares": 2,
+            "confidence": 0.5462,
+            "remaining_cash": 3820.52
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 180.51,
+            "shares": 2,
+            "confidence": 0.6051,
+            "remaining_cash": 3459.5
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 174.61,
+            "shares": 1,
+            "confidence": 0.6098,
+            "remaining_cash": 3284.89
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 175.88,
+            "shares": 1,
+            "confidence": 0.556,
+            "remaining_cash": 3109.01
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "SELL",
+            "price": 177.31,
+            "shares": 6,
+            "confidence": 0.4932,
+            "remaining_cash": 4172.84
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 173.73,
+            "shares": 2,
+            "confidence": 0.5266,
+            "remaining_cash": 3825.38
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 180.57,
+            "shares": 2,
+            "confidence": 0.5921,
+            "remaining_cash": 3464.24
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 183.26,
+            "shares": 1,
+            "confidence": 0.6154,
+            "remaining_cash": 3280.98
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 188.77,
+            "shares": 1,
+            "confidence": 0.575,
+            "remaining_cash": 3092.21
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 188.17,
+            "shares": 1,
+            "confidence": 0.5081,
+            "remaining_cash": 2904.04
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "SELL",
+            "price": 190.09,
+            "shares": 7,
+            "confidence": 0.4762,
+            "remaining_cash": 4234.64
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 187.78,
+            "shares": 2,
+            "confidence": 0.5086,
+            "remaining_cash": 3859.08
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 187.1,
+            "shares": 2,
+            "confidence": 0.5756,
+            "remaining_cash": 3484.87
+        },
+        {
+            "timestamp": "2026-09-12 01:45:57",
+            "ticker": "NVDA",
+            "action": "BUY",
+            "price": 186.06,
+            "shares": 1,
+            "confidence": 0.6155,
+            "remaining_cash": 3298.81
+        }
+    ]
+}
