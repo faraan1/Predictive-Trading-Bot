@@ -50,7 +50,7 @@ def load_processed_data(ticker):
 df_features, df_sentiment = load_processed_data(selected_ticker)
 trade_logs_path = "data/processed/trade_logs.json"
 
-# Helper function to append a new live trade order
+# Helper function to append a new live trade order with dynamic price fluctuations and variable shares
 def execute_live_simulated_trade(ticker, df_feat):
     if not os.path.exists(trade_logs_path):
         logs = {"account_balance": 10000.0, "history": []}
@@ -58,8 +58,12 @@ def execute_live_simulated_trade(ticker, df_feat):
         with open(trade_logs_path, "r") as f:
             logs = json.load(f)
 
-    # Get latest asset price
-    current_price = round(float(df_feat["Close"].iloc[-1]), 2) if df_feat is not None else 150.00
+    # Base price from feature matrix
+    base_price = float(df_feat["Close"].iloc[-1]) if df_feat is not None and not df_feat.empty else 150.00
+    
+    # Real-time price fluctuation (±0.5%) for dynamic presentation feedback
+    price_variation = np.random.uniform(-0.005, 0.005)
+    current_price = round(base_price * (1 + price_variation), 2)
     
     # Filter current history for this ticker to get remaining cash
     history = logs.get("history", [])
@@ -67,10 +71,10 @@ def execute_live_simulated_trade(ticker, df_feat):
     
     current_cash = ticker_trades[-1]["remaining_cash"] if ticker_trades else 10000.00
     
-    # Simulate inference signal
+    # Simulate inference signal & variable position sizing
     confidence = round(float(np.random.uniform(0.52, 0.68)), 4)
     action = "BUY" if confidence >= 0.55 else "SELL"
-    shares = 1 if action == "BUY" else 1
+    shares = int(np.random.choice([1, 2, 3]))
     
     cost = current_price * shares
     if action == "BUY" and current_cash >= cost:
@@ -226,5 +230,14 @@ elif selected_menu == "Settings":
         sell_threshold = st.slider("Signal Sell Threshold", min_value=0.10, max_value=0.50, value=0.45)
         
     st.markdown("---")
-    if st.button("💾 Save System Preferences"):
-        st.success("Settings saved locally!")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("💾 Save System Preferences"):
+            st.success("Settings saved locally!")
+    with col_b:
+        if st.button("🗑️ Reset All Trade Logs", type="secondary", use_container_width=True):
+            os.makedirs(os.path.dirname(trade_logs_path), exist_ok=True)
+            with open(trade_logs_path, "w") as f:
+                json.dump({"account_balance": 10000.0, "history": []}, f, indent=4)
+            st.success("Trade logs reset! All assets returned to $10,000.00 balance.")
+            st.rerun()
