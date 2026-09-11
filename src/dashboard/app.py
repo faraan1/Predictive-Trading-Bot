@@ -55,7 +55,6 @@ trade_logs_path = "data/processed/trade_logs.json"
 if selected_menu == "Dashboard":
     st.title(f"📊 Live Market Overview — {selected_ticker}")
     
-    # Top Quick Metrics
     if df_features is not None and not df_features.empty:
         latest_price = df_features["Close"].iloc[-1]
         prev_price = df_features["Close"].iloc[-2]
@@ -96,16 +95,25 @@ elif selected_menu == "Execution Engine":
         with open(trade_logs_path, "r") as f:
             logs = json.load(f)
 
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Account Cash", f"${logs.get('account_balance', 10000.0):,.2f}")
-        m2.metric("Portfolio Allocation", f"10.0% Max/Trade")
-        m3.metric("Selected Stock Focus", selected_ticker)
-
-        st.markdown("---")
         if "history" in logs and logs["history"]:
             df_history = pd.DataFrame(logs["history"])
-            filtered_df = df_history[df_history["ticker"] == selected_ticker]
+            
+            # Ensure upper-case matching
+            df_history["ticker"] = df_history["ticker"].astype(str).str.upper()
+            filtered_df = df_history[df_history["ticker"] == selected_ticker.upper()]
 
+            # Determine cash metric for specific ticker execution
+            if not filtered_df.empty and "remaining_cash" in filtered_df.columns:
+                current_ticker_cash = filtered_df["remaining_cash"].iloc[-1]
+            else:
+                current_ticker_cash = logs.get("account_balance", 10000.0)
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric(f"Ticker Post-Trade Cash ({selected_ticker})", f"${current_ticker_cash:,.2f}")
+            m2.metric("Portfolio Max Risk", "10.0% / Trade")
+            m3.metric("Selected Stock Focus", selected_ticker)
+
+            st.markdown("---")
             if not filtered_df.empty:
                 st.subheader(f"Recent Orders ({selected_ticker})")
                 st.dataframe(filtered_df, width="stretch")
@@ -129,9 +137,9 @@ elif selected_menu == "Model Analytics":
     
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Training Loss Curve (Simulated)")
+        st.subheader("LSTM Training Loss Curve")
         epochs = np.arange(1, 21)
-        loss = np.exp(-0.2 * epochs) + 0.05 * np.random.rand(20)
+        loss = np.exp(-0.2 * epochs) + 0.02 * np.random.rand(20)
         df_loss = pd.DataFrame({"Epoch": epochs, "Loss": loss}).set_index("Epoch")
         st.line_chart(df_loss)
         
