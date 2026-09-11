@@ -53,8 +53,12 @@ def save_headlines(articles: list, ticker: str, output_dir: str = "data/raw"):
     print(f"Successfully saved {len(articles)} headlines to {file_path}")
 
 
-if __name__ == "__main__":
-    ticker = "AAPL"
+def fetch_latest_news(ticker: str = "AAPL") -> str:
+    """Wrapper function for main pipeline orchestrator."""
     news_items = fetch_finance_news(ticker)
     save_headlines(news_items, ticker)
+    return f"data/raw/{ticker}_news.csv"
 
+
+if __name__ == "__main__":
+    fetch_latest_news("AAPL")

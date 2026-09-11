@@ -51,10 +51,13 @@ def save_processed_data(df: pd.DataFrame, ticker: str, output_dir: str = "data/r
     print(f"Successfully saved market data to {file_path}")
 
 
-if __name__ == "__main__":
-    # Test script with Apple stock (AAPL)
-    ticker = "AAPL"
-    data = fetch_historical_data(ticker, "2023-01-01", "2026-01-01")
+def fetch_market_data(ticker: str = "AAPL", start_date: str = "2023-01-01", end_date: str = "2026-01-01") -> str:
+    """Wrapper function for main pipeline orchestrator."""
+    data = fetch_historical_data(ticker, start_date, end_date)
     data_with_indicators = add_technical_indicators(data)
     save_processed_data(data_with_indicators, ticker)
+    return f"data/raw/{ticker}_historical.csv"
 
+
+if __name__ == "__main__":
+    fetch_market_data("AAPL")

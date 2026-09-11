@@ -48,13 +48,13 @@ class SentimentAnalyzer:
         print(f"Successfully saved sentiment analysis results to {output_file}")
 
 
-if __name__ == "__main__":
+def analyze_news_sentiment(input_file: str = "data/raw/AAPL_news.csv") -> str:
+    """Wrapper function for main pipeline orchestrator."""
     analyzer = SentimentAnalyzer()
-    input_path = "data/raw/AAPL_news.csv"
     output_path = "data/processed/AAPL_news_sentiment.csv"
-    
-    if os.path.exists(input_path):
-        analyzer.process_csv(input_path, output_path)
-    else:
-        print(f"Please run the scraper first. File missing: {input_path}")
+    analyzer.process_csv(input_file, output_path)
+    return output_path
 
+
+if __name__ == "__main__":
+    analyze_news_sentiment()
