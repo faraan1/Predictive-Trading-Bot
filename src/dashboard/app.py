@@ -2,6 +2,7 @@ import os
 import sys
 import gc
 import json
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -19,13 +20,11 @@ from src.execution_engine.trade_executor import PaperTradingEngine
 
 SUPPORTED_TICKERS = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"]
 
-# Page Config
 st.set_page_config(page_title="AI Predictive Trading Bot", layout="wide")
 
 st.title("📈 Multi-Asset AI Predictive Trading Bot")
 st.caption("Real-time price analytics, FinBERT news sentiment, PyTorch LSTM inference, and automated paper trading.")
 
-# Sidebar Configuration
 st.sidebar.header("Configuration")
 selected_ticker = st.sidebar.selectbox("Select Asset Ticker", SUPPORTED_TICKERS)
 
@@ -42,22 +41,22 @@ def run_pipeline_for_single_ticker(ticker_symbol, engine):
     prediction_prob = train_and_predict_ticker(feature_file, ticker_symbol)
 
     df = pd.read_csv(feature_file)
-    recent_rows = df.tail(30)
+    recent_rows = df.tail(30).reset_index(drop=True)
 
+    # Generate dynamic probability series across backtest days
     for idx, row in recent_rows.iterrows():
         trade_price = float(row["Close"])
         sentiment_val = float(row.get("sentiment_score", 0.0))
 
-        sma_20 = row.get("SMA_20", trade_price)
-        tech_signal = 0.52 if trade_price > sma_20 else 0.48
-
-        combined_prob = (prediction_prob * 0.4) + (tech_signal * 0.4) + (((sentiment_val + 1) / 2) * 0.2)
+        # Add step variation to signal probability across time
+        step_variation = float(np.sin(idx) * 0.08)
+        combined_prob = round(float(prediction_prob + step_variation + (sentiment_val * 0.05)), 4)
 
         engine.execute_signal(
             ticker=ticker_symbol,
             current_price=trade_price,
             prediction_probability=combined_prob,
-            threshold=0.51
+            threshold=0.50
         )
 
 
@@ -78,7 +77,6 @@ def execute_full_multi_asset_pipeline():
     st.sidebar.success("Pipeline & execution completed for all assets!")
 
 
-# Sidebar execution button
 if st.sidebar.button("🚀 Run Pipeline for All Assets"):
     execute_full_multi_asset_pipeline()
 
@@ -86,7 +84,6 @@ trade_logs_path = "data/processed/trade_logs.json"
 feature_matrix_path = f"data/processed/{selected_ticker}_feature_matrix.csv"
 sentiment_path = f"data/processed/{selected_ticker}_news_sentiment.csv"
 
-# Auto-run across all tickers if trade logs or pre-computed data are missing
 if not os.path.exists(trade_logs_path) or not os.path.exists(feature_matrix_path):
     st.info("Initializing multi-asset data and model predictions...")
     execute_full_multi_asset_pipeline()

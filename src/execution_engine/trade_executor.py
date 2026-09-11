@@ -9,7 +9,7 @@ class PaperTradingEngine:
         self.cash = initial_capital
         self.portfolio = {}  # {ticker: shares}
         self.trade_history = []
-        self.max_risk_per_trade = max_risk_per_trade  # 10% max capital allocation per trade
+        self.max_risk_per_trade = max_risk_per_trade
 
         # Load existing state if present
         self.load_trade_logs()
@@ -19,15 +19,15 @@ class PaperTradingEngine:
         allocation_amount = self.cash * self.max_risk_per_trade
         shares = int(allocation_amount // current_price)
         if shares == 0 and self.cash >= current_price:
-            shares = 1  # Buy at least 1 share if cash permits
+            shares = 1
         return shares
 
-    def execute_signal(self, ticker: str, current_price: float, prediction_probability: float, threshold: float = 0.51):
+    def execute_signal(self, ticker: str, current_price: float, prediction_probability: float, threshold: float = 0.50):
         """Execute Buy/Sell paper trades based on model signal confidence."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # BUY SIGNAL
-        if prediction_probability >= threshold:
+        # BUY SIGNAL (Probability > 0.50)
+        if prediction_probability > threshold:
             shares_to_buy = self.calculate_position_size(current_price)
             if shares_to_buy > 0:
                 cost = shares_to_buy * current_price
@@ -36,15 +36,19 @@ class PaperTradingEngine:
                     self.portfolio[ticker] = self.portfolio.get(ticker, 0) + shares_to_buy
                     
                     log_entry = {
-                        "timestamp": timestamp, "ticker": ticker, "action": "BUY",
-                        "price": round(current_price, 2), "shares": shares_to_buy,
-                        "confidence": round(prediction_probability, 4), "remaining_cash": round(self.cash, 2)
+                        "timestamp": timestamp,
+                        "ticker": ticker,
+                        "action": "BUY",
+                        "price": round(current_price, 2),
+                        "shares": shares_to_buy,
+                        "confidence": round(prediction_probability, 4),
+                        "remaining_cash": round(self.cash, 2)
                     }
                     self.trade_history.append(log_entry)
                     print(f"🟢 [BUY ORDER] Bought {shares_to_buy} shares of {ticker} @ ${current_price:.2f}")
 
-        # SELL SIGNAL
-        elif prediction_probability <= (1.0 - threshold):
+        # SELL SIGNAL (Probability <= 0.50)
+        else:
             if ticker in self.portfolio and self.portfolio[ticker] > 0:
                 shares_to_sell = self.portfolio[ticker]
                 revenue = shares_to_sell * current_price
@@ -52,14 +56,16 @@ class PaperTradingEngine:
                 self.portfolio[ticker] = 0
 
                 log_entry = {
-                    "timestamp": timestamp, "ticker": ticker, "action": "SELL",
-                    "price": round(current_price, 2), "shares": shares_to_sell,
-                    "confidence": round(prediction_probability, 4), "remaining_cash": round(self.cash, 2)
+                    "timestamp": timestamp,
+                    "ticker": ticker,
+                    "action": "SELL",
+                    "price": round(current_price, 2),
+                    "shares": shares_to_sell,
+                    "confidence": round(prediction_probability, 4),
+                    "remaining_cash": round(self.cash, 2)
                 }
                 self.trade_history.append(log_entry)
                 print(f"🔴 [SELL ORDER] Sold {shares_to_sell} shares of {ticker} @ ${current_price:.2f}")
-        else:
-            print(f"⚪ [HOLD] Model confidence ({prediction_probability:.2f}) within neutral band. No trade executed.")
 
     def load_trade_logs(self):
         """Load existing portfolio balance and history if available."""
