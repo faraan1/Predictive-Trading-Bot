@@ -1,0 +1,15 @@
+# Python / Environment
+__pycache__/
+*.py[cod]
+.env
+.venv/
+
+# Data / Logs
+data/
+*.csv
+*.sqlite
+*.db
+
+# IDE
+.vscode/
+.idea/
