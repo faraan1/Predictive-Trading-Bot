@@ -18,22 +18,24 @@ def build_unified_dataset(price_file: str, sentiment_file: str, output_file: str
     sentiment_df['Date'] = pd.to_datetime(sentiment_df['published_at'], errors='coerce').dt.date
     sentiment_df = sentiment_df.dropna(subset=['Date'])
 
-    # 3. Aggregate Daily Sentiment Scores
-    daily_sentiment = sentiment_df.groupby('Date').agg({
-        'positive': 'mean',
-        'negative': 'mean',
-        'neutral': 'mean',
-        'sentiment_score': 'mean'
-    }).reset_index()
+    # 3. Identify Available Sentiment Columns
+    possible_sentiment_cols = ['positive', 'negative', 'neutral', 'sentiment_score']
+    available_sentiment_cols = [col for col in possible_sentiment_cols if col in sentiment_df.columns]
 
-    # 4. Merge Price Data with Sentiment Data
+    if not available_sentiment_cols:
+        raise KeyError("No recognized sentiment columns found in sentiment dataset.")
+
+    # 4. Aggregate Daily Sentiment Scores
+    agg_dict = {col: 'mean' for col in available_sentiment_cols}
+    daily_sentiment = sentiment_df.groupby('Date').agg(agg_dict).reset_index()
+
+    # 5. Merge Price Data with Sentiment Data
     merged_df = pd.merge(price_df, daily_sentiment, on='Date', how='left')
 
-    # 5. Handle Days Without News (Fill NaN sentiment with neutral default 0.0)
-    sentiment_cols = ['positive', 'negative', 'neutral', 'sentiment_score']
-    merged_df[sentiment_cols] = merged_df[sentiment_cols].fillna(0.0)
+    # 6. Handle Days Without News (Fill NaN sentiment with default 0.0)
+    merged_df[available_sentiment_cols] = merged_df[available_sentiment_cols].fillna(0.0)
 
-    # 6. Save Unified Dataset
+    # 7. Save Unified Dataset
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     merged_df.to_csv(output_file, index=False)
     print(f"Successfully generated merged dataset ({len(merged_df)} rows) at {output_file}")

@@ -1,60 +1,45 @@
 import os
 import pandas as pd
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 
+def analyze_news_sentiment(news_file: str, ticker: str = "AAPL") -> str:
+    """Analyzes sentiment of headlines and saves output dynamically per ticker."""
+    if not os.path.exists(news_file):
+        raise FileNotFoundError(f"News file not found: {news_file}")
 
-class SentimentAnalyzer:
-    def __init__(self, model_name: str = "ProsusAI/finbert"):
-        print("Loading FinBERT model and tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
-        self.labels = ["positive", "negative", "neutral"]
+    df = pd.read_csv(news_file)
+    if df.empty or "headline" not in df.columns:
+        # Fallback if no headlines exist
+        df = pd.DataFrame({"headline": ["No news"], "sentiment_score": [0.0]})
+        output_file = f"data/processed/{ticker}_news_sentiment.csv"
+        df.to_csv(output_file, index=False)
+        return output_file
 
-    def analyze_headline(self, headline: str) -> dict:
-        """Process a single headline and return probabilities for positive, negative, and neutral."""
-        inputs = self.tokenizer(headline, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            scores = torch.nn.functional.softmax(outputs.logits, dim=-1)[0].tolist()
+    print("Loading FinBERT model and tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained("ProsusAI/finbert")
+    model = AutoModelForSequenceClassification.from_pretrained("ProsusAI/finbert")
+    nlp = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
 
-        result = dict(zip(self.labels, scores))
-        # Compute a single aggregate sentiment score (-1.0 to +1.0)
-        result["sentiment_score"] = result["positive"] - result["negative"]
-        return result
+    print(f"Analyzing sentiment for {len(df)} headlines...")
+    results = nlp(df["headline"].tolist())
 
-    def process_csv(self, input_file: str, output_file: str):
-        """Load headlines from CSV, calculate sentiment scores, and save processed results."""
-        if not os.path.exists(input_file):
-            raise FileNotFoundError(f"File not found: {input_file}")
+    scores = []
+    for res in results:
+        label = res["label"]
+        score = res["score"]
+        if label == "positive":
+            scores.append(score)
+        elif label == "negative":
+            scores.append(-score)
+        else:
+            scores.append(0.0)
 
-        df = pd.read_csv(input_file)
-        if "headline" not in df.columns:
-            raise ValueError("CSV must contain a 'headline' column.")
+    df["sentiment_score"] = scores
 
-        print(f"Analyzing sentiment for {len(df)} headlines...")
-        
-        scores_list = []
-        for headline in df["headline"]:
-            scores = self.analyze_headline(str(headline))
-            scores_list.append(scores)
+    # Save dynamic output file using selected ticker
+    os.makedirs("data/processed", exist_ok=True)
+    output_file = f"data/processed/{ticker}_news_sentiment.csv"
+    df.to_csv(output_file, index=False)
+    print(f"Successfully saved sentiment analysis results to {output_file}")
 
-        scores_df = pd.DataFrame(scores_list)
-        final_df = pd.concat([df, scores_df], axis=1)
-
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        final_df.to_csv(output_file, index=False)
-        print(f"Successfully saved sentiment analysis results to {output_file}")
-
-
-def analyze_news_sentiment(input_file: str = "data/raw/AAPL_news.csv") -> str:
-    """Wrapper function for main pipeline orchestrator."""
-    analyzer = SentimentAnalyzer()
-    output_path = "data/processed/AAPL_news_sentiment.csv"
-    analyzer.process_csv(input_file, output_path)
-    return output_path
-
-
-if __name__ == "__main__":
-    analyze_news_sentiment()
+    return output_file

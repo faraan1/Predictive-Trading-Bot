@@ -7,7 +7,6 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 
 
-# 1. Dataset Preparation with Sliding Windows
 class TimeSeriesDataset(Dataset):
     def __init__(self, features, targets, seq_length=10):
         self.seq_length = seq_length
@@ -27,7 +26,6 @@ class TimeSeriesDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 
-# 2. PyTorch LSTM Architecture
 class LSTMPricePredictor(nn.Module):
     def __init__(self, input_size, hidden_size=64, num_layers=2):
         super(LSTMPricePredictor, self).__init__()
@@ -37,77 +35,70 @@ class LSTMPricePredictor(nn.Module):
 
     def forward(self, x):
         out, _ = self.lstm(x)
-        out = self.fc(out[:, -1, :])  # Take output from last time step
+        out = self.fc(out[:, -1, :])  # Output from last timestep
         return self.sigmoid(out)
 
 
-# 3. Model Training Pipeline
-def train_model(feature_file: str, epochs=15, seq_length=10):
+def train_and_predict_ticker(feature_file: str, ticker: str, epochs=15, seq_length=10) -> float:
+    """Trains the LSTM model for a specific ticker and returns the probability for the next trading day."""
     if not os.path.exists(feature_file):
         raise FileNotFoundError(f"Feature matrix missing: {feature_file}")
 
     df = pd.read_csv(feature_file)
+    feature_cols = ['Close', 'Volume', 'SMA_20', 'SMA_50', 'RSI', 'MACD', 'sentiment_score']
     
-    # Create target: 1 if Close price tomorrow > Close price today, else 0
+    # Fill missing columns/NAs gracefully
+    for col in feature_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+    df[feature_cols] = df[feature_cols].fillna(0.0)
+
+    # Directional Target (1 if tomorrow > today)
     df['Target'] = (df['Close'].shift(-1) > df['Close']).astype(int)
     df = df.dropna().reset_index(drop=True)
 
-    feature_cols = ['Close', 'Volume', 'SMA_20', 'SMA_50', 'RSI', 'MACD', 'sentiment_score']
-    
+    if len(df) < seq_length + 5:
+        return 0.50  # Fallback probability if dataset is too small
+
     scaler = StandardScaler()
     scaled_features = scaler.fit_transform(df[feature_cols])
     targets = df['Target'].values
 
-    # Train/Test Split (80/20 sequential split)
-    split_idx = int(len(scaled_features) * 0.8)
-    train_X, test_X = scaled_features[:split_idx], scaled_features[split_idx:]
-    train_y, test_y = targets[:split_idx], targets[split_idx:]
+    # Dataset & Loader setup
+    dataset = TimeSeriesDataset(scaled_features, targets, seq_length)
+    if len(dataset) == 0:
+        return 0.50
 
-    train_dataset = TimeSeriesDataset(train_X, train_y, seq_length)
-    test_dataset = TimeSeriesDataset(test_X, test_y, seq_length)
+    train_loader = DataLoader(dataset, batch_size=16, shuffle=False)
 
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
-
-    # Initialize Network
     model = LSTMPricePredictor(input_size=len(feature_cols))
     criterion = nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    print("Training LSTM Price Predictor...")
     model.train()
     for epoch in range(epochs):
-        epoch_loss = 0.0
         for batch_X, batch_y in train_loader:
             optimizer.zero_grad()
             predictions = model(batch_X)
             loss = criterion(predictions, batch_y)
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.item()
-        
-        if (epoch + 1) % 5 == 0:
-            print(f"Epoch {epoch + 1}/{epochs} - Loss: {epoch_loss / len(train_loader):.4f}")
 
-    # Evaluation
+    # Save model checkpoint dynamically per ticker
+    model_dir = "models"
+    os.makedirs(model_dir, exist_ok=True)
+    model_save_path = os.path.join(model_dir, f"lstm_{ticker.lower()}.pth")
+    torch.save(model.state_dict(), model_save_path)
+
+    # Predict probability for the latest window sequence
     model.eval()
-    correct, total = 0, 0
     with torch.no_grad():
-        for batch_X, batch_y in test_loader:
-            preds = model(batch_X)
-            predicted_labels = (preds >= 0.5).float()
-            correct += (predicted_labels == batch_y).sum().item()
-            total += batch_y.size(0)
+        latest_seq = torch.tensor(scaled_features[-seq_length:], dtype=torch.float32).unsqueeze(0)
+        prob = model(latest_seq).item()
 
-    accuracy = (correct / total) * 100
-    print(f"\nModel Test Directional Accuracy: {accuracy:.2f}%")
-
-    # Save Model Weights
-    os.makedirs("models", exist_ok=True)
-    torch.save(model.state_dict(), "models/lstm_aapl.pth")
-    print("Saved trained model to models/lstm_aapl.pth")
+    return float(prob)
 
 
 if __name__ == "__main__":
-    train_model("data/processed/AAPL_feature_matrix.csv")
-
+    test_prob = train_and_predict_ticker("data/processed/AAPL_feature_matrix.csv", "AAPL")
+    print(f"AAPL Next Day Directional Probability: {test_prob:.4f}")
