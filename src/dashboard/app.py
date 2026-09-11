@@ -43,16 +43,29 @@ def execute_full_pipeline(selected_ticker):
         # 4. PyTorch LSTM Inference
         prediction_prob = train_and_predict_ticker(feature_file, selected_ticker)
 
-        # 5. Signal Execution
+        # 5. Dynamic Multi-Trade Backtest Signal Execution
         df = pd.read_csv(feature_file)
-        latest_price = float(df["Close"].iloc[-1])
-
         engine = PaperTradingEngine(initial_capital=10000.0)
-        engine.execute_signal(
-            ticker=selected_ticker,
-            current_price=latest_price,
-            prediction_probability=prediction_prob
-        )
+
+        # Simulate execution over the last 15 trading rows to register multiple trades
+        recent_rows = df.tail(15)
+        for idx, row in recent_rows.iterrows():
+            trade_price = float(row["Close"])
+            
+            # Combine sentiment score with model prediction for dynamic probability
+            sentiment_val = row.get("sentiment_score", 0.0)
+            if sentiment_val != 0.0:
+                # Scaled combined probability signal
+                combined_prob = (prediction_prob + (sentiment_val + 1) / 2) / 2
+            else:
+                combined_prob = prediction_prob
+
+            engine.execute_signal(
+                ticker=selected_ticker,
+                current_price=trade_price,
+                prediction_probability=combined_prob
+            )
+
         engine.save_trade_logs()
 
     st.sidebar.success(f"Pipeline & Model Inference completed for {selected_ticker}!")
