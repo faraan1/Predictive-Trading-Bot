@@ -102,14 +102,16 @@ elif selected_menu == "Execution Engine":
             df_history["ticker"] = df_history["ticker"].astype(str).str.upper()
             filtered_df = df_history[df_history["ticker"] == selected_ticker.upper()]
 
-            # Determine cash metric for specific ticker execution
+            # Proper cash display logic per asset
             if not filtered_df.empty and "remaining_cash" in filtered_df.columns:
                 current_ticker_cash = filtered_df["remaining_cash"].iloc[-1]
+                cash_label = f"Post-Trade Cash ({selected_ticker})"
             else:
-                current_ticker_cash = logs.get("account_balance", 10000.0)
+                current_ticker_cash = 10000.00
+                cash_label = f"Allocated Capital ({selected_ticker})"
 
             m1, m2, m3 = st.columns(3)
-            m1.metric(f"Ticker Post-Trade Cash ({selected_ticker})", f"${current_ticker_cash:,.2f}")
+            m1.metric(cash_label, f"${current_ticker_cash:,.2f}")
             m2.metric("Portfolio Max Risk", "10.0% / Trade")
             m3.metric("Selected Stock Focus", selected_ticker)
 
@@ -118,7 +120,7 @@ elif selected_menu == "Execution Engine":
                 st.subheader(f"Recent Orders ({selected_ticker})")
                 st.dataframe(filtered_df, width="stretch")
             else:
-                st.info(f"No trades logged yet for {selected_ticker}.")
+                st.info(f"No trades logged yet for {selected_ticker}. Initial balance remains unallocated.")
         else:
             st.info("No trade history available yet.")
 
