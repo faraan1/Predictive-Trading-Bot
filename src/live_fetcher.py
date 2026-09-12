@@ -31,11 +31,18 @@ def fetch_live_feature_matrix(ticker):
 
 def get_latest_live_price(ticker):
     """
-    Fetches the most recent live market price for a given ticker.
+    Fetches latest price for ticker with fallback for PSX / limited-data assets.
     """
-    stock = yf.Ticker(ticker)
-    live_data = stock.history(period="1d", interval="1m")
-    
-    if not live_data.empty:
-        return round(float(live_data["Close"].iloc[-1]), 2)
+    try:
+        stock = yf.Ticker(ticker)
+        # 1-minute interval often fails on PSX (.KA) tickers on Yahoo Finance
+        interval = "1d" if ticker.endswith(".KA") else "1m"
+        period = "5d" if ticker.endswith(".KA") else "1d"
+        
+        live_data = stock.history(period=period, interval=interval)
+        if not live_data.empty and "Close" in live_data.columns:
+            return round(float(live_data["Close"].iloc[-1]), 2)
+    except Exception as e:
+        print(f"[Warning] Unable to fetch live price for {ticker}: {e}")
+        
     return None
