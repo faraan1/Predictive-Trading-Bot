@@ -6,3 +6,5 @@ numpy
 plotly
 yfinance
 -e .
+transformers
+torch
