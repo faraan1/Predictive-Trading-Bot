@@ -1,8 +1,10 @@
 import os
 import sys
 
-# Get absolute path to the project root directory
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Calculate path relative to src/dashboard/
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "../.."))
+
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
