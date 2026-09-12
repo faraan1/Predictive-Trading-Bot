@@ -25,9 +25,8 @@ An end-to-end multi-asset predictive trading application powered by PyTorch LSTM
 
 ---
 
-## 📂 Project Structure
+## 📁 Project Structure
 
-```text
 ```text
 predictive-trading-bot/
 |-- models/                   # Saved PyTorch (.pth) model weights
