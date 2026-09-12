@@ -19,8 +19,9 @@ import torch.nn as nn
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Import live fetcher functions (Now sys.path includes the root, so this import succeeds)
+# Import live fetcher functions
 from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
+from src.execution_engine.risk_manager import RiskManager
 
 # PyTorch LSTM Model Architecture
 class TradingLSTM(nn.Module):
@@ -143,7 +144,7 @@ def plot_interactive_candlestick(df, ticker):
 # ---------------------------------------------------------
 def generate_trade_recommendation(df_feat, model):
     if df_feat is None or df_feat.empty:
-        return "NEUTRAL", "Insufficient live data to compute signal.", 0.0, "HIGH RISK"
+        return "NEUTRAL", "Insufficient live data to compute signal.", 0.0, "HIGH RISK", None
     
     # 1. Fetch Model Probability Output
     if model is not None and len(df_feat) >= 10:
@@ -160,10 +161,14 @@ def generate_trade_recommendation(df_feat, model):
     else:
         confidence = round(float(np.random.uniform(0.55, 0.68)), 4)
 
-    # 2. Technical Indicator Checks
+    # 2. Technical Indicator Checks & Current Price
     latest_rsi = df_feat["RSI"].iloc[-1] if "RSI" in df_feat.columns else 50.0
-    latest_close = df_feat["Close"].iloc[-1]
+    latest_close = float(df_feat["Close"].iloc[-1])
     sma_20 = df_feat["SMA_20"].iloc[-1] if "SMA_20" in df_feat.columns else latest_close
+
+    # Calculate Risk Management metrics
+    risk_mgr = RiskManager(account_balance=10000.0, risk_per_trade=0.02, stop_loss_pct=0.015, take_profit_pct=0.03)
+    risk_params = risk_mgr.calculate_position_size(current_price=latest_close)
 
     # 3. Decision Matrix & Risk Rules
     if latest_rsi > 70:
@@ -187,7 +192,7 @@ def generate_trade_recommendation(df_feat, model):
         risk_level = "LOW RISK"
         reasoning = "No strong directional edge detected. Market is ranging."
 
-    return signal, reasoning, confidence, risk_level
+    return signal, reasoning, confidence, risk_level, risk_params
 
 # Helper function to append a new live trade order driven by PyTorch inference
 def execute_live_simulated_trade(ticker, df_feat, override_action=None):
@@ -284,7 +289,7 @@ if selected_menu == "Dashboard":
     st.subheader("🤖 QuantAI Live Decision & Risk Advisor")
     
     model = load_pytorch_model()
-    signal, reasoning, confidence, risk_level = generate_trade_recommendation(df_features, model)
+    signal, reasoning, confidence, risk_level, risk_params = generate_trade_recommendation(df_features, model)
 
     card_col1, card_col2, card_col3 = st.columns([1, 1, 2])
 
@@ -302,6 +307,14 @@ if selected_menu == "Dashboard":
 
     with card_col3:
         st.info(f"**Market Analysis:**\n\n{reasoning}")
+
+    if risk_params is not None:
+        st.markdown("#### 🛡️ Calculated Risk Parameters")
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric("Max Position Units", f"{risk_params['units']} shares")
+        r2.metric("Stop-Loss Target", f"${risk_params['stop_loss_price']}")
+        r3.metric("Take-Profit Target", f"${risk_params['take_profit_price']}")
+        r4.metric("Risk Capital at Stake", f"${risk_params['risk_amount']}")
 
     st.markdown("---")
 
@@ -330,7 +343,7 @@ elif selected_menu == "Execution Engine":
     st.title("💳 Automated Paper Trading Status")
 
     model = load_pytorch_model()
-    signal, reasoning, confidence, risk_level = generate_trade_recommendation(df_features, model)
+    signal, reasoning, confidence, risk_level, risk_params = generate_trade_recommendation(df_features, model)
 
     if os.path.exists(trade_logs_path):
         with open(trade_logs_path, "r") as f:
