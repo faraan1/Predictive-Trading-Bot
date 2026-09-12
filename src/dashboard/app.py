@@ -1,5 +1,11 @@
 import os
 import sys
+
+# Append root directory to sys.path FIRST before local module imports
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
 import json
 import pandas as pd
 import numpy as np
@@ -13,7 +19,7 @@ import torch.nn as nn
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Import live fetcher functions
+# Import live fetcher functions (Now sys.path includes the root, so this import succeeds)
 from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
 
 # PyTorch LSTM Model Architecture
@@ -28,11 +34,6 @@ class TradingLSTM(nn.Module):
         out, _ = self.lstm(x)
         out = self.fc(out[:, -1, :])
         return self.sigmoid(out)
-
-# Append root directory to sys.path
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
 
 SUPPORTED_TICKERS = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"]
 
