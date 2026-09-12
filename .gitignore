@@ -1,15 +1,9 @@
-# Python / Environment
 __pycache__/
 *.py[cod]
-.env
+.pytest_cache/
 .venv/
-
-# Data / Logs
-data/
-*.csv
-*.sqlite
-*.db
-
-# IDE
-.vscode/
-.idea/
+env/
+venv/
+fin_bot/
+data/processed/trade_logs.json
+*.pth
