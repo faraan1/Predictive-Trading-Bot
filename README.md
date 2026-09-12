@@ -36,19 +36,3 @@ predictive-trading-bot/
 |   |-- processing/           # Data fetchers & feature matrices
 |-- requirements.txt          # Production dependencies
 |-- README.md                 # Project documentation
-
-## 🏗️ System Architecture & Data Flow
-
-```mermaid
-flowchart TD
-    A[yfinance API] -->|Market OHLCV Data| B(Feature Engineering Pipeline)
-    C[Financial News API / Web] -->|Raw Headlines| D(FinBERT Sentiment Model)
-    
-    B -->|Technical Indicators| E[Feature Matrix Consolidation]
-    D -->|Sentiment Confidence Score| E
-    
-    E -->|Sequence Tensors| F[PyTorch Bi-LSTM Model]
-    F -->|Bullish / Bearish Probability| G[QuantAI Risk Advisor Engine]
-    
-    G -->|Interactive UI & Signals| H[Streamlit Frontend Dashboard]
-    H -->|Simulated Orders| I[(Paper Trading Logger / JSON)]
