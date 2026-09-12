@@ -6,4 +6,4 @@ torch
 yfinance
 transformers
 beautifulsoup4
-requests
+requestsplotly 
