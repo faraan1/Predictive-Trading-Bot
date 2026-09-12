@@ -138,7 +138,7 @@ def plot_interactive_candlestick(df, ticker):
     return fig
 
 # ---------------------------------------------------------
-# STEP 1: Live Signal Engine & Risk Advisor Logic
+# Live Signal Engine & Risk Advisor Logic
 # ---------------------------------------------------------
 def generate_trade_recommendation(df_feat, model):
     if df_feat is None or df_feat.empty:
@@ -189,7 +189,7 @@ def generate_trade_recommendation(df_feat, model):
     return signal, reasoning, confidence, risk_level
 
 # Helper function to append a new live trade order driven by PyTorch inference
-def execute_live_simulated_trade(ticker, df_feat):
+def execute_live_simulated_trade(ticker, df_feat, override_action=None):
     if not os.path.exists(trade_logs_path):
         logs = {"account_balance": 10000.0, "history": []}
     else:
@@ -226,7 +226,7 @@ def execute_live_simulated_trade(ticker, df_feat):
     else:
         confidence = round(float(np.random.uniform(0.55, 0.68)), 4)
 
-    action = "BUY" if confidence >= 0.55 else "SELL"
+    action = override_action if override_action else ("BUY" if confidence >= 0.55 else "SELL")
     shares = int(np.random.choice([1, 2, 3]))
     
     execution_price = round(base_price + slippage if action == "BUY" else base_price - slippage, 2)
@@ -279,9 +279,7 @@ if selected_menu == "Dashboard":
     
     st.markdown("---")
 
-    # ---------------------------------------------------------
-    # STEP 2: Advisor Card UI Display
-    # ---------------------------------------------------------
+    # Advisor Card UI Display
     st.subheader("🤖 QuantAI Live Decision & Risk Advisor")
     
     model = load_pytorch_model()
@@ -330,6 +328,9 @@ if selected_menu == "Dashboard":
 elif selected_menu == "Execution Engine":
     st.title("💳 Automated Paper Trading Status")
 
+    model = load_pytorch_model()
+    signal, reasoning, confidence, risk_level = generate_trade_recommendation(df_features, model)
+
     if os.path.exists(trade_logs_path):
         with open(trade_logs_path, "r") as f:
             logs = json.load(f)
@@ -350,20 +351,33 @@ elif selected_menu == "Execution Engine":
 
         m1, m2, m3, m4 = st.columns(4)
         m1.metric(cash_label, f"${current_ticker_cash:,.2f}")
-        m2.metric("Execution Model", "Market Order + Slippage")
+        m2.metric("Execution Guard", "Advisor Protected")
         m3.metric("Transaction Fee", "$1.00 / order")
-        m4.metric("Selected Asset Focus", selected_ticker)
+        m4.metric("Risk Status", risk_level)
 
+        st.markdown("---")
+
+        auto_trade = st.toggle("🤖 Enable Auto-Trading Mode (Executes automatically when Advisor approves)", value=False)
+        
+        if auto_trade and ("BUY" in signal and "NOT" not in signal):
+            new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action="BUY")
+            st.toast(f"Auto-Trader: Executed BUY for {selected_ticker} @ ${new_trade['price']}", icon="🤖")
+        
         st.markdown("---")
         
         c_left, c_right = st.columns([1.5, 1])
         with c_left:
             st.subheader(f"Recent Orders & Positions ({selected_ticker})")
         with c_right:
-            if st.button(f"⚡ Execute Live Order for {selected_ticker}", type="primary", use_container_width=True):
-                new_trade = execute_live_simulated_trade(selected_ticker, df_features)
-                st.toast(f"Executed {new_trade['action']} for {selected_ticker} @ ${new_trade['price']} (Slippage: +${new_trade['slippage']})", icon="✅")
-                st.rerun()
+            if risk_level == "HIGH RISK":
+                st.button(f"🚫 Trade Blocked ({risk_level})", disabled=True, use_container_width=True)
+                st.caption(f"Reason: {reasoning}")
+            else:
+                if st.button(f"⚡ Execute Live Order for {selected_ticker}", type="primary", use_container_width=True):
+                    act = "BUY" if "BUY" in signal else "SELL"
+                    new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action=act)
+                    st.toast(f"Executed {new_trade['action']} for {selected_ticker} @ ${new_trade['price']} (Slippage: +${new_trade['slippage']})", icon="✅")
+                    st.rerun()
 
         if not filtered_df.empty:
             st.dataframe(filtered_df, width="stretch")
