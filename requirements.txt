@@ -2,8 +2,6 @@ streamlit
 streamlit-option-menu
 pandas
 numpy
-torch
 yfinance
-transformers
-beautifulsoup4
-requestsplotly 
+plotly
+torch --extra-index-url https://download.pytorch.org/whl/cpu
