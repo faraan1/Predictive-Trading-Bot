@@ -233,11 +233,15 @@ def generate_trade_recommendation(df_feat, model):
 
 # Helper function to append a new live trade order driven by PyTorch inference
 def execute_live_simulated_trade(ticker, df_feat, override_action=None):
+    os.makedirs(os.path.dirname(trade_logs_path), exist_ok=True)
     if not os.path.exists(trade_logs_path):
         logs = {"account_balance": 10000.0, "history": []}
     else:
-        with open(trade_logs_path, "r") as f:
-            logs = json.load(f)
+        try:
+            with open(trade_logs_path, "r") as f:
+                logs = json.load(f)
+        except Exception:
+            logs = {"account_balance": 10000.0, "history": []}
 
     live_price = get_latest_live_price(ticker)
     if live_price is not None:
@@ -297,7 +301,6 @@ def execute_live_simulated_trade(ticker, df_feat, override_action=None):
     history.append(new_order)
     logs["history"] = history
     
-    os.makedirs(os.path.dirname(trade_logs_path), exist_ok=True)
     with open(trade_logs_path, "w") as f:
         json.dump(logs, f, indent=4)
         
@@ -379,61 +382,69 @@ if selected_menu == "Dashboard":
 elif selected_menu == "Execution Engine":
     st.title("💳 Automated Paper Trading Status")
 
+    # Cloud Runtime Safety Net: Initialize directory & trade_logs.json if non-existent
+    os.makedirs(os.path.dirname(trade_logs_path), exist_ok=True)
+    if not os.path.exists(trade_logs_path):
+        with open(trade_logs_path, "w") as f:
+            json.dump({"account_balance": 10000.0, "history": []}, f, indent=4)
+
     model = load_pytorch_model()
     signal, reasoning, confidence, risk_level, risk_params = generate_trade_recommendation(df_features, model)
 
-    if os.path.exists(trade_logs_path):
+    try:
         with open(trade_logs_path, "r") as f:
             logs = json.load(f)
+    except Exception:
+        logs = {"account_balance": 10000.0, "history": []}
 
-        df_history = pd.DataFrame(logs.get("history", []))
-        if not df_history.empty:
-            df_history["ticker"] = df_history["ticker"].astype(str).str.upper()
-            filtered_df = df_history[df_history["ticker"] == selected_ticker.upper()]
+    df_history = pd.DataFrame(logs.get("history", []))
+    if not df_history.empty and "ticker" in df_history.columns:
+        df_history["ticker"] = df_history["ticker"].astype(str).str.upper()
+        filtered_df = df_history[df_history["ticker"] == selected_ticker.upper()]
+    else:
+        filtered_df = pd.DataFrame()
+
+    if not filtered_df.empty and "remaining_cash" in filtered_df.columns:
+        current_ticker_cash = filtered_df["remaining_cash"].iloc[-1]
+        cash_label = f"Available Cash ({selected_ticker})"
+    else:
+        current_ticker_cash = 10000.00
+        cash_label = f"Allocated Capital ({selected_ticker})"
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric(cash_label, f"{currency_symbol}{current_ticker_cash:,.2f}")
+    m2.metric("Execution Guard", "Advisor Protected")
+    m3.metric("Transaction Fee", f"{currency_symbol}1.00 / order")
+    m4.metric("Risk Status", risk_level)
+
+    st.markdown("---")
+
+    auto_trade = st.toggle("🤖 Enable Auto-Trading Mode (Executes automatically when Advisor approves)", value=False)
+    
+    if auto_trade and ("BUY" in signal and "NOT" not in signal):
+        new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action="BUY")
+        st.toast(f"Auto-Trader: Executed BUY for {selected_ticker} @ {currency_symbol}{new_trade['price']}", icon="🤖")
+    
+    st.markdown("---")
+    
+    c_left, c_right = st.columns([1.5, 1])
+    with c_left:
+        st.subheader(f"Recent Orders & Positions ({selected_ticker})")
+    with c_right:
+        if risk_level == "HIGH RISK":
+            st.button(f"🚫 Trade Blocked ({risk_level})", disabled=True, use_container_width=True)
+            st.caption(f"Reason: {reasoning}")
         else:
-            filtered_df = pd.DataFrame()
+            if st.button(f"⚡ Execute Live Order for {selected_ticker}", type="primary", use_container_width=True):
+                act = "BUY" if "BUY" in signal else "SELL"
+                new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action=act)
+                st.toast(f"Executed {new_trade['action']} for {selected_ticker} @ {currency_symbol}{new_trade['price']} (Slippage: +{currency_symbol}{new_trade['slippage']})", icon="✅")
+                st.rerun()
 
-        if not filtered_df.empty and "remaining_cash" in filtered_df.columns:
-            current_ticker_cash = filtered_df["remaining_cash"].iloc[-1]
-            cash_label = f"Available Cash ({selected_ticker})"
-        else:
-            current_ticker_cash = 10000.00
-            cash_label = f"Allocated Capital ({selected_ticker})"
-
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric(cash_label, f"{currency_symbol}{current_ticker_cash:,.2f}")
-        m2.metric("Execution Guard", "Advisor Protected")
-        m3.metric("Transaction Fee", f"{currency_symbol}1.00 / order")
-        m4.metric("Risk Status", risk_level)
-
-        st.markdown("---")
-
-        auto_trade = st.toggle("🤖 Enable Auto-Trading Mode (Executes automatically when Advisor approves)", value=False)
-        
-        if auto_trade and ("BUY" in signal and "NOT" not in signal):
-            new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action="BUY")
-            st.toast(f"Auto-Trader: Executed BUY for {selected_ticker} @ {currency_symbol}{new_trade['price']}", icon="🤖")
-        
-        st.markdown("---")
-        
-        c_left, c_right = st.columns([1.5, 1])
-        with c_left:
-            st.subheader(f"Recent Orders & Positions ({selected_ticker})")
-        with c_right:
-            if risk_level == "HIGH RISK":
-                st.button(f"🚫 Trade Blocked ({risk_level})", disabled=True, use_container_width=True)
-                st.caption(f"Reason: {reasoning}")
-            else:
-                if st.button(f"⚡ Execute Live Order for {selected_ticker}", type="primary", use_container_width=True):
-                    act = "BUY" if "BUY" in signal else "SELL"
-                    new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action=act)
-                    st.toast(f"Executed {new_trade['action']} for {selected_ticker} @ {currency_symbol}{new_trade['price']} (Slippage: +{currency_symbol}{new_trade['slippage']})", icon="✅")
-                    st.rerun()
-
-        if not filtered_df.empty:
-            st.dataframe(filtered_df, width="stretch")
-        else:
-            st.info(f"No trades logged yet for {selected_ticker}. Click the button above to execute a live trade.")
+    if not filtered_df.empty:
+        st.dataframe(filtered_df, width="stretch")
+    else:
+        st.info(f"No trades logged yet for {selected_ticker}. Click the button above to execute a live trade.")
 
 # ---------------------------------------------------------
 # Page 3: Model Analytics
