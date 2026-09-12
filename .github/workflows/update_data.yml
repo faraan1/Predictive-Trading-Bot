@@ -1,0 +1,37 @@
+name: Scheduled Data Pipeline Update
+
+on:
+  schedule:
+    # Runs every 6 hours (at minute 0)
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Fetch Fresh Market & Sentiment Data
+      run: |
+        python main.py
+
+    - name: Commit and Push Updated Data
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add data/
+        git diff-index --quiet HEAD || git commit -m "chore: auto-update feature matrices and sentiment data [skip ci]"
+        git push
