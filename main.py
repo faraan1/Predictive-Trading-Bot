@@ -1,3 +1,4 @@
+from config.config import DEFAULT_TICKERS
 from src.ml_pipeline.processing.market_data import fetch_market_data
 from src.ml_pipeline.scrapers.news_scraper import fetch_latest_news
 from src.ml_pipeline.models.sentiment_analyzer import analyze_news_sentiment
@@ -63,4 +64,5 @@ def run_pipeline(ticker="AAPL"):
 
 
 if __name__ == "__main__":
-    run_pipeline()
+    for ticker in DEFAULT_TICKERS:
+        run_pipeline(ticker=ticker)

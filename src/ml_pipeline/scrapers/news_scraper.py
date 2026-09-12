@@ -41,16 +41,18 @@ def fetch_finance_news(ticker: str) -> list:
 
 
 def save_headlines(articles: list, ticker: str, output_dir: str = "data/raw"):
-    """Save scraped headlines to CSV."""
-    if not articles:
-        print("No articles found to save.")
-        return
-
+    """Save scraped headlines to CSV, creating an empty CSV if no articles found."""
     os.makedirs(output_dir, exist_ok=True)
-    df = pd.DataFrame(articles)
     file_path = os.path.join(output_dir, f"{ticker}_news.csv")
+    
+    if not articles:
+        print(f"No articles found to save for {ticker}. Creating empty news CSV.")
+        df = pd.DataFrame(columns=["ticker", "headline", "published_at", "url", "scraped_at"])
+    else:
+        df = pd.DataFrame(articles)
+        print(f"Successfully saved {len(articles)} headlines to {file_path}")
+
     df.to_csv(file_path, index=False)
-    print(f"Successfully saved {len(articles)} headlines to {file_path}")
 
 
 def fetch_latest_news(ticker: str = "AAPL") -> str:

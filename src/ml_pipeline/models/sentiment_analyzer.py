@@ -2,17 +2,26 @@ import os
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, pipeline
 
-def analyze_news_sentiment(news_file: str, ticker: str = "AAPL") -> str:
+def analyze_news_sentiment(news_file: str, ticker: str = None) -> str:
     """Analyzes sentiment of headlines and saves output dynamically per ticker."""
+    # Infer ticker from filename if not explicitly passed
+    if ticker is None:
+        ticker = os.path.basename(news_file).replace("_news.csv", "")
+
+    os.makedirs("data/processed", exist_ok=True)
+    output_file = f"data/processed/{ticker}_news_sentiment.csv"
+
     if not os.path.exists(news_file):
-        raise FileNotFoundError(f"News file not found: {news_file}")
+        print(f"Warning: {news_file} missing. Creating fallback sentiment matrix.")
+        df_empty = pd.DataFrame({"headline": ["No news"], "sentiment_score": [0.0]})
+        df_empty.to_csv(output_file, index=False)
+        return output_file
 
     df = pd.read_csv(news_file)
     if df.empty or "headline" not in df.columns:
-        # Fallback if no headlines exist
-        df = pd.DataFrame({"headline": ["No news"], "sentiment_score": [0.0]})
-        output_file = f"data/processed/{ticker}_news_sentiment.csv"
-        df.to_csv(output_file, index=False)
+        print(f"No headlines found in {news_file}. Saving neutral baseline.")
+        df_empty = pd.DataFrame({"headline": ["No news"], "sentiment_score": [0.0]})
+        df_empty.to_csv(output_file, index=False)
         return output_file
 
     print("Loading FinBERT model and tokenizer...")
@@ -36,9 +45,6 @@ def analyze_news_sentiment(news_file: str, ticker: str = "AAPL") -> str:
 
     df["sentiment_score"] = scores
 
-    # Save dynamic output file using selected ticker
-    os.makedirs("data/processed", exist_ok=True)
-    output_file = f"data/processed/{ticker}_news_sentiment.csv"
     df.to_csv(output_file, index=False)
     print(f"Successfully saved sentiment analysis results to {output_file}")
 

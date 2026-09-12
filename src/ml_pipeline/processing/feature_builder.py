@@ -15,38 +15,41 @@ def build_unified_dataset(
     sentiment_file = Path(sentiment_file)
     output_file = Path(output_file)
 
-    if not price_file.exists() or not sentiment_file.exists():
-        raise FileNotFoundError("Input files missing. Run market_data and sentiment_analyzer first.")
+    if not price_file.exists():
+        raise FileNotFoundError(f"Price data file missing: {price_file}")
 
     # 1. Load Datasets
     price_df = pd.read_csv(price_file)
-    sentiment_df = pd.read_csv(sentiment_file)
-
-    # 2. Format Dates
     price_df['Date'] = pd.to_datetime(price_df['Date']).dt.date
-    
-    # Extract date from news published timestamp
-    sentiment_df['Date'] = pd.to_datetime(sentiment_df['published_at'], errors='coerce').dt.date
-    sentiment_df = sentiment_df.dropna(subset=['Date'])
 
-    # 3. Identify Available Sentiment Columns
-    possible_sentiment_cols = ['positive', 'negative', 'neutral', 'sentiment_score']
-    available_sentiment_cols = [col for col in possible_sentiment_cols if col in sentiment_df.columns]
+    # Load sentiment safely if file exists and has content
+    if sentiment_file.exists() and sentiment_file.stat().st_size > 0:
+        sentiment_df = pd.read_csv(sentiment_file)
+    else:
+        sentiment_df = pd.DataFrame()
 
-    if not available_sentiment_cols:
-        raise KeyError("No recognized sentiment columns found in sentiment dataset.")
+    # 2. Check for valid sentiment columns and published_at timestamp
+    if not sentiment_df.empty and 'published_at' in sentiment_df.columns:
+        sentiment_df['Date'] = pd.to_datetime(sentiment_df['published_at'], errors='coerce').dt.date
+        sentiment_df = sentiment_df.dropna(subset=['Date'])
 
-    # 4. Aggregate Daily Sentiment Scores
-    agg_dict = {col: 'mean' for col in available_sentiment_cols}
-    daily_sentiment = sentiment_df.groupby('Date').agg(agg_dict).reset_index()
+        possible_sentiment_cols = ['positive', 'negative', 'neutral', 'sentiment_score']
+        available_sentiment_cols = [col for col in possible_sentiment_cols if col in sentiment_df.columns]
 
-    # 5. Merge Price Data with Sentiment Data
-    merged_df = pd.merge(price_df, daily_sentiment, on='Date', how='left')
+        if available_sentiment_cols:
+            agg_dict = {col: 'mean' for col in available_sentiment_cols}
+            daily_sentiment = sentiment_df.groupby('Date').agg(agg_dict).reset_index()
+            merged_df = pd.merge(price_df, daily_sentiment, on='Date', how='left')
+            merged_df[available_sentiment_cols] = merged_df[available_sentiment_cols].fillna(0.0)
+        else:
+            merged_df = price_df.copy()
+            merged_df['sentiment_score'] = 0.0
+    else:
+        # Fallback when zero news articles are scraped for a ticker
+        merged_df = price_df.copy()
+        merged_df['sentiment_score'] = 0.0
 
-    # 6. Handle Days Without News (Fill NaN sentiment with default 0.0)
-    merged_df[available_sentiment_cols] = merged_df[available_sentiment_cols].fillna(0.0)
-
-    # 7. Save Unified Dataset
+    # 3. Save Unified Dataset
     output_file.parent.mkdir(parents=True, exist_ok=True)
     merged_df.to_csv(output_file, index=False)
     print(f"Successfully generated merged dataset ({len(merged_df)} rows) at {output_file}")

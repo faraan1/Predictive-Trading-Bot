@@ -6,7 +6,23 @@ DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = BASE_DIR / "models"
 
 # Data Fetching Defaults
-DEFAULT_TICKERS = ["AAPL", "MSFT", "GOOGL", "NVDA", "TSLA"]
+# Expanded universe: 5 US Tech + Top 10 Pakistan Heavyweights (PSX)
+DEFAULT_TICKERS = [
+    # US Equities
+    "AAPL", "MSFT", "GOOGL", "NVDA", "TSLA",
+    
+    # Pakistan Stock Exchange (PSX) Top 10
+    "HBL.KA",   # Habib Bank Limited
+    "MCB.KA",   # MCB Bank Limited
+    "UBL.KA",   # United Bank Limited
+    "MEBL.KA",  # Meezan Bank Limited
+    "OGDC.KA",  # Oil & Gas Development Company
+    "PPL.KA",   # Pakistan Petroleum Limited
+    "ENGRO.KA", # Engro Corporation
+    "FFC.KA",   # Fauji Fertilizer Company
+    "LUCK.KA",  # Lucky Cement
+    "SYS.KA"    # Systems Limited
+]
 DEFAULT_PERIOD = "2y"
 DEFAULT_INTERVAL = "1d"
 
