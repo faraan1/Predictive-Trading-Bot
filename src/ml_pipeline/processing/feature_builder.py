@@ -1,10 +1,21 @@
 import os
 import pandas as pd
+from typing import Union
+from pathlib import Path
+from config.config import DATA_DIR
 
 
-def build_unified_dataset(price_file: str, sentiment_file: str, output_file: str):
+def build_unified_dataset(
+    price_file: Union[str, Path], 
+    sentiment_file: Union[str, Path], 
+    output_file: Union[str, Path]
+) -> None:
     """Merge historical price indicators with aggregated daily sentiment scores."""
-    if not os.path.exists(price_file) or not os.path.exists(sentiment_file):
+    price_file = Path(price_file)
+    sentiment_file = Path(sentiment_file)
+    output_file = Path(output_file)
+
+    if not price_file.exists() or not sentiment_file.exists():
         raise FileNotFoundError("Input files missing. Run market_data and sentiment_analyzer first.")
 
     # 1. Load Datasets
@@ -36,14 +47,14 @@ def build_unified_dataset(price_file: str, sentiment_file: str, output_file: str
     merged_df[available_sentiment_cols] = merged_df[available_sentiment_cols].fillna(0.0)
 
     # 7. Save Unified Dataset
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
     merged_df.to_csv(output_file, index=False)
     print(f"Successfully generated merged dataset ({len(merged_df)} rows) at {output_file}")
 
 
 if __name__ == "__main__":
-    price_path = "data/raw/AAPL_historical.csv"
-    sentiment_path = "data/processed/AAPL_news_sentiment.csv"
-    output_path = "data/processed/AAPL_feature_matrix.csv"
+    price_path = DATA_DIR / "raw" / "AAPL_historical.csv"
+    sentiment_path = DATA_DIR / "processed" / "AAPL_news_sentiment.csv"
+    output_path = DATA_DIR / "processed" / "AAPL_feature_matrix.csv"
 
     build_unified_dataset(price_path, sentiment_path, output_path)

@@ -1,16 +1,13 @@
 import os
 import sys
+from pathlib import Path
 
-# Locate absolute paths for Streamlit Cloud deployment
-FILE_PATH = os.path.abspath(__file__)
-DASHBOARD_DIR = os.path.dirname(FILE_PATH)
-SRC_DIR = os.path.dirname(DASHBOARD_DIR)
-PROJECT_ROOT = os.path.dirname(SRC_DIR)
+# Force root resolution relative to this exact file for Streamlit Cloud
+FILE_DIR = Path(__file__).resolve().parent
+ROOT_DIR = FILE_DIR.parent.parent
 
-# Force project root and src directory into sys.path
-for path in [PROJECT_ROOT, SRC_DIR, os.getcwd()]:
-    if path not in sys.path:
-        sys.path.insert(0, path)
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 import json
 import pandas as pd
@@ -25,13 +22,9 @@ import torch.nn as nn
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Import live fetcher functions and risk manager with fallback for Cloud deployment
-try:
-    from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
-    from src.execution_engine.risk_manager import RiskManager
-except ModuleNotFoundError:
-    from live_fetcher import fetch_live_feature_matrix, get_latest_live_price
-    from execution_engine.risk_manager import RiskManager
+# Import module dependencies directly from root
+from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
+from src.execution_engine.risk_manager import RiskManager
 
 # PyTorch LSTM Model Architecture
 class TradingLSTM(nn.Module):

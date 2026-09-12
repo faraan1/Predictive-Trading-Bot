@@ -1,4 +1,26 @@
 {
-    "account_balance": 10000.0,
-    "history": []
+    "account_balance": 8196.0,
+    "portfolio": {
+        "AAPL": 8
+    },
+    "history": [
+        {
+            "timestamp": "2026-09-12 18:23:13",
+            "ticker": "AAPL",
+            "action": "BUY",
+            "price": 225.5,
+            "shares": 4,
+            "confidence": 0.62,
+            "remaining_cash": 9098.0
+        },
+        {
+            "timestamp": "2026-09-12 18:48:33",
+            "ticker": "AAPL",
+            "action": "BUY",
+            "price": 225.5,
+            "shares": 4,
+            "confidence": 0.62,
+            "remaining_cash": 8196.0
+        }
+    ]
 }
