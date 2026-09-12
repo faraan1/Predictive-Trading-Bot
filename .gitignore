@@ -16,3 +16,5 @@ data/logs/*.log
 .idea/
 .DS_Store
 *.swp
+
+data/raw/*.csv
