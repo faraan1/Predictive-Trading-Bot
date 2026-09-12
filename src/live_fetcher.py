@@ -43,6 +43,6 @@ def get_latest_live_price(ticker):
         if not live_data.empty and "Close" in live_data.columns:
             return round(float(live_data["Close"].iloc[-1]), 2)
     except Exception as e:
-        print(f"[Warning] Unable to fetch live price for {ticker}: {e}")
+        print(f"[Warning] Unable to fetch live price via yfinance for {ticker}: {e}")
         
     return None
