@@ -25,6 +25,7 @@ from plotly.subplots import make_subplots
 # Import module dependencies directly from root
 from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
 from src.execution_engine.risk_manager import RiskManager
+from config.config import DATA_DIR, TICKERS
 
 # PyTorch LSTM Model Architecture
 class TradingLSTM(nn.Module):
@@ -39,7 +40,20 @@ class TradingLSTM(nn.Module):
         out = self.fc(out[:, -1, :])
         return self.sigmoid(out)
 
-SUPPORTED_TICKERS = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL"]
+# ---------------------------------------------------------
+# Dynamic Ticker Detection
+# ---------------------------------------------------------
+@st.cache_data(ttl=300)
+def get_available_tickers():
+    processed_dir = DATA_DIR / "processed"
+    if processed_dir.exists():
+        feature_files = list(processed_dir.glob("*_feature_matrix.csv"))
+        if feature_files:
+            detected = sorted([f.name.replace("_feature_matrix.csv", "") for f in feature_files])
+            return list(dict.fromkeys(TICKERS + detected))
+    return TICKERS
+
+AVAILABLE_TICKERS = get_available_tickers()
 
 st.set_page_config(page_title="AI Predictive Trading Bot", layout="wide", page_icon="📈")
 
@@ -58,9 +72,25 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.subheader("Asset Selector")
-    selected_ticker = st.selectbox("Select Target Stock", SUPPORTED_TICKERS)
-    
+    st.subheader("Market & Asset Selector")
+
+    us_tickers = [t for t in AVAILABLE_TICKERS if not t.endswith(".KA")]
+    psx_tickers = [t for t in AVAILABLE_TICKERS if t.endswith(".KA")]
+
+    market_choice = st.radio("Select Market:", ["All", "US Equities", "PSX (Pakistan)"])
+
+    if market_choice == "US Equities":
+        selectable_tickers = us_tickers
+    elif market_choice == "PSX (Pakistan)":
+        selectable_tickers = psx_tickers
+    else:
+        selectable_tickers = AVAILABLE_TICKERS
+
+    selected_ticker = st.selectbox("Select Target Stock", selectable_tickers if selectable_tickers else AVAILABLE_TICKERS)
+
+    # Dynamic currency helper
+    currency_symbol = "PKR " if selected_ticker.endswith(".KA") else "$"
+
     st.markdown("---")
     st.caption("Status: **Engine Online (Live API)**")
 
@@ -93,12 +123,12 @@ def load_pytorch_model():
             return None
     return None
 
-def plot_interactive_candlestick(df, ticker):
+def plot_interactive_candlestick(df, ticker, symbol):
     fig = make_subplots(
         rows=2, cols=1, 
         shared_xaxes=True, 
         vertical_spacing=0.03, 
-        subplot_titles=(f"{ticker} OHLC Price & Indicators", "RSI Oscillator"),
+        subplot_titles=(f"{ticker} OHLC Price ({symbol}) & Indicators", "RSI Oscillator"),
         row_width=[0.25, 0.75]
     )
 
@@ -281,8 +311,8 @@ if selected_menu == "Dashboard":
         delta_val = round(latest_price - prev_price, 2)
         
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Latest Close", f"${latest_price:.2f}", f"{delta_val:+.2f}")
-        m2.metric("SMA 20", f"${df_features.get('SMA_20', df_features['Close']).iloc[-1]:.2f}")
+        m1.metric("Latest Close", f"{currency_symbol}{latest_price:.2f}", f"{delta_val:+.2f}")
+        m2.metric("SMA 20", f"{currency_symbol}{df_features.get('SMA_20', df_features['Close']).iloc[-1]:.2f}")
         m3.metric("RSI (14)", f"{df_features.get('RSI', pd.Series([50.0])).iloc[-1]:.1f}")
         m4.metric("Active Asset Focus", selected_ticker)
     
@@ -315,9 +345,9 @@ if selected_menu == "Dashboard":
         st.markdown("#### 🛡️ Calculated Risk Parameters")
         r1, r2, r3, r4 = st.columns(4)
         r1.metric("Max Position Units", f"{risk_params['units']} shares")
-        r2.metric("Stop-Loss Target", f"${risk_params['stop_loss_price']}")
-        r3.metric("Take-Profit Target", f"${risk_params['take_profit_price']}")
-        r4.metric("Risk Capital at Stake", f"${risk_params['risk_amount']}")
+        r2.metric("Stop-Loss Target", f"{currency_symbol}{risk_params['stop_loss_price']}")
+        r3.metric("Take-Profit Target", f"{currency_symbol}{risk_params['take_profit_price']}")
+        r4.metric("Risk Capital at Stake", f"{currency_symbol}{risk_params['risk_amount']}")
 
     st.markdown("---")
 
@@ -326,7 +356,7 @@ if selected_menu == "Dashboard":
     with col1:
         st.subheader("Price Action & Indicators")
         if df_features is not None:
-            st.plotly_chart(plot_interactive_candlestick(df_features, selected_ticker), use_container_width=True)
+            st.plotly_chart(plot_interactive_candlestick(df_features, selected_ticker, currency_symbol), use_container_width=True)
             with st.expander("View Raw Technical Feature Matrix"):
                 st.dataframe(df_features.tail(15), width="stretch")
         else:
@@ -367,9 +397,9 @@ elif selected_menu == "Execution Engine":
             cash_label = f"Allocated Capital ({selected_ticker})"
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric(cash_label, f"${current_ticker_cash:,.2f}")
+        m1.metric(cash_label, f"{currency_symbol}{current_ticker_cash:,.2f}")
         m2.metric("Execution Guard", "Advisor Protected")
-        m3.metric("Transaction Fee", "$1.00 / order")
+        m3.metric("Transaction Fee", f"{currency_symbol}1.00 / order")
         m4.metric("Risk Status", risk_level)
 
         st.markdown("---")
@@ -378,7 +408,7 @@ elif selected_menu == "Execution Engine":
         
         if auto_trade and ("BUY" in signal and "NOT" not in signal):
             new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action="BUY")
-            st.toast(f"Auto-Trader: Executed BUY for {selected_ticker} @ ${new_trade['price']}", icon="🤖")
+            st.toast(f"Auto-Trader: Executed BUY for {selected_ticker} @ {currency_symbol}{new_trade['price']}", icon="🤖")
         
         st.markdown("---")
         
@@ -393,7 +423,7 @@ elif selected_menu == "Execution Engine":
                 if st.button(f"⚡ Execute Live Order for {selected_ticker}", type="primary", use_container_width=True):
                     act = "BUY" if "BUY" in signal else "SELL"
                     new_trade = execute_live_simulated_trade(selected_ticker, df_features, override_action=act)
-                    st.toast(f"Executed {new_trade['action']} for {selected_ticker} @ ${new_trade['price']} (Slippage: +${new_trade['slippage']})", icon="✅")
+                    st.toast(f"Executed {new_trade['action']} for {selected_ticker} @ {currency_symbol}{new_trade['price']} (Slippage: +{currency_symbol}{new_trade['slippage']})", icon="✅")
                     st.rerun()
 
         if not filtered_df.empty:
@@ -472,7 +502,7 @@ elif selected_menu == "Settings":
     st.subheader("Risk & Capital Controls")
     c1, c2 = st.columns(2)
     with c1:
-        initial_capital = st.number_input("Starting Capital ($)", value=10000.0, step=500.0)
+        initial_capital = st.number_input(f"Starting Capital ({currency_symbol})", value=10000.0, step=500.0)
         risk_per_trade = st.slider("Max Risk per Trade (%)", min_value=1, max_value=25, value=10)
     with c2:
         buy_threshold = st.slider("Signal Buy Threshold", min_value=0.50, max_value=0.90, value=0.55)
@@ -488,5 +518,5 @@ elif selected_menu == "Settings":
             os.makedirs(os.path.dirname(trade_logs_path), exist_ok=True)
             with open(trade_logs_path, "w") as f:
                 json.dump({"account_balance": 10000.0, "history": []}, f, indent=4)
-            st.success("Trade logs reset! All assets returned to $10,000.00 balance.")
+            st.success("Trade logs reset! All assets returned to baseline balance.")
             st.rerun()
