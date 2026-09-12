@@ -1,12 +1,15 @@
 import os
 import sys
 
-# Calculate path relative to src/dashboard/
+# Compute project root (two levels up from src/dashboard/)
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, "../.."))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
 
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
+# Ensure root and working directories are at the front of sys.path
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+if os.getcwd() not in sys.path:
+    sys.path.insert(0, os.getcwd())
 
 import json
 import pandas as pd
