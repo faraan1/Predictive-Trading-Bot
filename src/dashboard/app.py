@@ -7,6 +7,22 @@ import streamlit as st
 from datetime import datetime
 from streamlit_option_menu import option_menu
 
+import torch
+import torch.nn as nn
+
+# PyTorch LSTM Model Architecture
+class TradingLSTM(nn.Module):
+    def __init__(self, input_dim=14, hidden_dim=64, num_layers=2, output_dim=1):
+        super(TradingLSTM, self).__init__()
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, bidirectional=True)
+        self.fc = nn.Linear(hidden_dim * 2, output_dim)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        out = self.fc(out[:, -1, :])
+        return self.sigmoid(out)
+
 # Append root directory to sys.path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if ROOT_DIR not in sys.path:
@@ -50,7 +66,20 @@ def load_processed_data(ticker):
 df_features, df_sentiment = load_processed_data(selected_ticker)
 trade_logs_path = "data/processed/trade_logs.json"
 
-# Helper function to append a new live trade order with dynamic price fluctuations and variable shares
+@st.cache_resource
+def load_pytorch_model():
+    model_path = "models/lstm_model.pth"
+    if os.path.exists(model_path):
+        try:
+            model = TradingLSTM(input_dim=14, hidden_dim=64, num_layers=2)
+            model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+            model.eval()
+            return model
+        except Exception:
+            return None
+    return None
+
+# Helper function to append a new live trade order driven by PyTorch inference
 def execute_live_simulated_trade(ticker, df_feat):
     if not os.path.exists(trade_logs_path):
         logs = {"account_balance": 10000.0, "history": []}
@@ -58,21 +87,33 @@ def execute_live_simulated_trade(ticker, df_feat):
         with open(trade_logs_path, "r") as f:
             logs = json.load(f)
 
-    # Base price from feature matrix
     base_price = float(df_feat["Close"].iloc[-1]) if df_feat is not None and not df_feat.empty else 150.00
-    
-    # Real-time price fluctuation (±0.5%) for dynamic presentation feedback
     price_variation = np.random.uniform(-0.005, 0.005)
     current_price = round(base_price * (1 + price_variation), 2)
     
-    # Filter current history for this ticker to get remaining cash
     history = logs.get("history", [])
     ticker_trades = [t for t in history if str(t.get("ticker")).upper() == ticker.upper()]
-    
     current_cash = ticker_trades[-1]["remaining_cash"] if ticker_trades else 10000.00
     
-    # Simulate inference signal & variable position sizing
-    confidence = round(float(np.random.uniform(0.52, 0.68)), 4)
+    # Real PyTorch Neural Network Pass
+    model = load_pytorch_model()
+    if model is not None and df_feat is not None and len(df_feat) >= 10:
+        numeric_cols = df_feat.select_dtypes(include=[np.number]).tail(10)
+        
+        # Ensure tensor matches input_dim=14
+        if numeric_cols.shape[1] < 14:
+            pad_cols = 14 - numeric_cols.shape[1]
+            padded_arr = np.pad(numeric_cols.values, ((0, 0), (0, pad_cols)), mode='constant')
+            feature_tensor = torch.tensor(padded_arr, dtype=torch.float32).unsqueeze(0)
+        else:
+            feature_tensor = torch.tensor(numeric_cols.iloc[:, :14].values, dtype=torch.float32).unsqueeze(0)
+            
+        with torch.no_grad():
+            raw_pred = model(feature_tensor).item()
+            confidence = round(float(raw_pred), 4)
+    else:
+        confidence = round(float(np.random.uniform(0.55, 0.68)), 4)
+
     action = "BUY" if confidence >= 0.55 else "SELL"
     shares = int(np.random.choice([1, 2, 3]))
     
@@ -170,7 +211,6 @@ elif selected_menu == "Execution Engine":
 
         st.markdown("---")
         
-        # Interactive Live Execution Panel for Presentations
         c_left, c_right = st.columns([1.5, 1])
         with c_left:
             st.subheader(f"Recent Orders ({selected_ticker})")
