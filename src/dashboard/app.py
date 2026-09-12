@@ -10,6 +10,9 @@ from streamlit_option_menu import option_menu
 import torch
 import torch.nn as nn
 
+# Import live fetcher functions
+from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
+
 # PyTorch LSTM Model Architecture
 class TradingLSTM(nn.Module):
     def __init__(self, input_dim=14, hidden_dim=64, num_layers=2, output_dim=1):
@@ -51,14 +54,19 @@ with st.sidebar:
     selected_ticker = st.selectbox("Select Target Stock", SUPPORTED_TICKERS)
     
     st.markdown("---")
-    st.caption("Status: **Engine Online**")
+    st.caption("Status: **Engine Online (Live API)**")
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_processed_data(ticker):
-    feature_file = f"data/processed/{ticker}_feature_matrix.csv"
-    sentiment_file = f"data/processed/{ticker}_news_sentiment.csv"
+    # Try fetching live data from Yahoo Finance API first
+    df_features = fetch_live_feature_matrix(ticker)
     
-    df_features = pd.read_csv(feature_file) if os.path.exists(feature_file) else None
+    # Fallback to local historical CSV if offline or API unavailable
+    if df_features is None or df_features.empty:
+        feature_file = f"data/processed/{ticker}_feature_matrix.csv"
+        df_features = pd.read_csv(feature_file) if os.path.exists(feature_file) else None
+
+    sentiment_file = f"data/processed/{ticker}_news_sentiment.csv"
     df_sentiment = pd.read_csv(sentiment_file) if os.path.exists(sentiment_file) else None
     
     return df_features, df_sentiment
@@ -87,9 +95,14 @@ def execute_live_simulated_trade(ticker, df_feat):
         with open(trade_logs_path, "r") as f:
             logs = json.load(f)
 
-    base_price = float(df_feat["Close"].iloc[-1]) if df_feat is not None and not df_feat.empty else 150.00
-    price_variation = np.random.uniform(-0.005, 0.005)
-    current_price = round(base_price * (1 + price_variation), 2)
+    # Fetch live price via yfinance or fall back to feature matrix
+    live_price = get_latest_live_price(ticker)
+    if live_price is not None:
+        current_price = live_price
+    else:
+        base_price = float(df_feat["Close"].iloc[-1]) if df_feat is not None and not df_feat.empty else 150.00
+        price_variation = np.random.uniform(-0.005, 0.005)
+        current_price = round(base_price * (1 + price_variation), 2)
     
     history = logs.get("history", [])
     ticker_trades = [t for t in history if str(t.get("ticker")).upper() == ticker.upper()]
@@ -167,7 +180,7 @@ if selected_menu == "Dashboard":
     with col1:
         st.subheader("Price Action & Indicators")
         if df_features is not None:
-            st.line_chart(df_features.set_index("Date")["Close"])
+            st.line_chart(df_features.set_index("Date" if "Date" in df_features.columns else df_features.columns[0])["Close"])
             with st.expander("View Raw Technical Feature Matrix"):
                 st.dataframe(df_features.tail(15), width="stretch")
         else:
