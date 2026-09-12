@@ -1,15 +1,16 @@
 import os
 import sys
 
-# Compute project root (two levels up from src/dashboard/)
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+# Locate absolute paths for Streamlit Cloud deployment
+FILE_PATH = os.path.abspath(__file__)
+DASHBOARD_DIR = os.path.dirname(FILE_PATH)
+SRC_DIR = os.path.dirname(DASHBOARD_DIR)
+PROJECT_ROOT = os.path.dirname(SRC_DIR)
 
-# Ensure root and working directories are at the front of sys.path
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-if os.getcwd() not in sys.path:
-    sys.path.insert(0, os.getcwd())
+# Force project root and src directory into sys.path
+for path in [PROJECT_ROOT, SRC_DIR, os.getcwd()]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 import json
 import pandas as pd
