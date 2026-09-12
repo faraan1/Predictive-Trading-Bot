@@ -23,6 +23,10 @@ DEFAULT_TICKERS = [
     "LUCK.KA",  # Lucky Cement
     "SYS.KA"    # Systems Limited
 ]
+
+# Export TICKERS alias to ensure backward compatibility with app.py imports
+TICKERS = DEFAULT_TICKERS
+
 DEFAULT_PERIOD = "2y"
 DEFAULT_INTERVAL = "1d"
 

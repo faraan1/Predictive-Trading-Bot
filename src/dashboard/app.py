@@ -25,7 +25,11 @@ from plotly.subplots import make_subplots
 # Import module dependencies directly from root
 from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
 from src.execution_engine.risk_manager import RiskManager
-from config.config import DATA_DIR, TICKERS
+
+try:
+    from config.config import DATA_DIR, TICKERS
+except ImportError:
+    from config.config import DATA_DIR, DEFAULT_TICKERS as TICKERS
 
 # PyTorch LSTM Model Architecture
 class TradingLSTM(nn.Module):
