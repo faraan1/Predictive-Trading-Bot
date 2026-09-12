@@ -25,9 +25,13 @@ import torch.nn as nn
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Import live fetcher functions
-from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
-from src.execution_engine.risk_manager import RiskManager
+# Import live fetcher functions and risk manager with fallback for Cloud deployment
+try:
+    from src.live_fetcher import fetch_live_feature_matrix, get_latest_live_price
+    from src.execution_engine.risk_manager import RiskManager
+except ModuleNotFoundError:
+    from live_fetcher import fetch_live_feature_matrix, get_latest_live_price
+    from execution_engine.risk_manager import RiskManager
 
 # PyTorch LSTM Model Architecture
 class TradingLSTM(nn.Module):
